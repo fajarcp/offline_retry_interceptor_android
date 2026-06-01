@@ -52,7 +52,7 @@ allprojects {
 
 ```kotlin
 dependencies {
-    implementation("com.github.fajarcp:offline-retry-interceptor:1.0.1")
+    implementation("com.github.fajarcp:offline-retry-interceptor:1.0.2")
 }
 ```
 
