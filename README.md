@@ -1,33 +1,58 @@
-# Offline Retry Interceptor (Android / Kotlin)
+# Offline Retry Interceptor
 
-A lightweight, unopinionated OkHttp interceptor for Android that automatically queues failed network requests offline and silently retries them when connectivity is restored.
+A lightweight Android/Kotlin OkHttp interceptor that automatically queues failed network requests when the device is offline and silently retries them when connectivity returns.
 
-Built and maintained by MockNode.
+Designed for mobile applications where losing user submissions is unacceptable.
 
-Never lose a user's data submission just because they drove through a tunnel or lost cell service.
+> Never lose a user's form submission because they entered a tunnel, switched networks, or temporarily lost signal.
 
 ---
 
 ## Features
 
-- 📡 **Offline Queueing** – Automatically catches `IOException` connection failures from OkHttp.
-- 💾 **Zero-Boilerplate Storage** – Uses native Android `SharedPreferences` as a lightweight NoSQL queue.
-- 🔄 **Smart Retries** – Silently flushes queued requests when connectivity returns.
-- 🛡️ **GET Request Safe** – Automatically ignores `GET` requests to prevent stale fetches.
-- ⚡ **Plug & Play** – One file, one line of initialization.
-- 🚀 **Retrofit Compatible** – Works seamlessly with Retrofit and OkHttp.
+✅ Automatic Offline Queueing
+✅ SharedPreferences-Based Storage (No Database Required)
+✅ Automatic Retry When Connectivity Returns
+✅ Retrofit Compatible
+✅ Safe by Default (GET Requests Ignored)
+✅ Minimal Setup
+✅ Zero Additional Runtime Dependencies
 
 ---
 
 ## Installation
 
-### Gradle
+### Step 1: Add JitPack Repository
 
-> Replace with your actual Maven Central or JitPack coordinates once published.
+Add JitPack to your `settings.gradle.kts`:
+
+```kotlin
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven(url = "https://jitpack.io")
+    }
+}
+```
+
+For older Gradle versions:
+
+```gradle
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+    }
+}
+```
+
+### Step 2: Add Dependency
 
 ```kotlin
 dependencies {
-    implementation("dev.mocknode:offline-retry-interceptor:1.0.0")
+    implementation("com.github.fajarcp:offline-retry-interceptor:1.0.0")
 }
 ```
 
@@ -35,7 +60,7 @@ dependencies {
 
 ## Quick Start
 
-### Initialize the Interceptor
+Add the interceptor to your OkHttp client:
 
 ```kotlin
 val client = OkHttpClient.Builder()
@@ -47,10 +72,13 @@ val client = OkHttpClient.Builder()
 
 Use Retrofit or OkHttp exactly as you normally would.
 
-### Example Request
+---
+
+## Example
 
 ```kotlin
 try {
+
     val request = Request.Builder()
         .url("https://api.example.com/submit")
         .post(jsonBody)
@@ -60,13 +88,11 @@ try {
 
 } catch (e: IOException) {
 
-    // Device is offline.
-    // The interceptor automatically saves the request
-    // and retries it later when connectivity returns.
+    // Request has already been queued
+    // by OfflineRetryInterceptor.
 
-    Log.d(
-        "Network",
-        "Device offline. Request queued securely."
+    showSnackbar(
+        "You're offline. Changes will sync automatically."
     )
 }
 ```
@@ -75,203 +101,180 @@ try {
 
 ## How It Works
 
-### 1. Request Fails
-
-When OkHttp throws an `IOException` because the device has no internet connection:
+### When Offline
 
 ```text
-POST /submit
-        ↓
+POST Request
+      │
+      ▼
 IOException
-```
-
-The interceptor catches the exception internally.
-
----
-
-### 2. Request Is Queued
-
-For supported HTTP methods:
-
-- POST
-- PUT
-- PATCH
-- DELETE
-
-the interceptor serializes:
-
-- URL
-- Headers
-- Request Body
-- HTTP Method
-
-and stores them in a private `SharedPreferences` queue.
-
-```text
-Offline Request
-        ↓
-Serialize
-        ↓
+      │
+      ▼
+Request Serialized
+      │
+      ▼
 SharedPreferences Queue
 ```
 
-`GET` requests are intentionally ignored.
+The interceptor automatically captures failed requests caused by connectivity issues.
 
 ---
 
-### 3. Exception Still Propagates
+### Supported Offline Methods
 
-The original exception is re-thrown so your UI can respond appropriately.
+The following request types are stored and retried:
 
-Example:
+| HTTP Method | Supported |
+| ----------- | --------- |
+| POST        | ✅         |
+| PUT         | ✅         |
+| PATCH       | ✅         |
+| DELETE      | ✅         |
+| GET         | ❌         |
+| HEAD        | ❌         |
+| OPTIONS     | ❌         |
 
-```kotlin
-showSnackbar("You're offline. Changes saved and will sync automatically.")
-```
+GET requests are intentionally excluded to avoid replaying stale fetch operations.
 
 ---
 
-### 4. Connectivity Returns
+### When Connectivity Returns
 
-The next successful network request acts as proof that connectivity is available again.
+The next successful network request acts as proof that internet access is available.
 
 ```text
 Successful Request
-        ↓
-Internet Restored
-        ↓
+      │
+      ▼
 Flush Queue
+      │
+      ▼
+Replay Stored Requests
+      │
+      ▼
+Remove Successful Entries
 ```
+
+Retries occur automatically in the background.
+
+No user action required.
 
 ---
 
-### 5. Automatic Retry
+## What Gets Stored?
 
-A lightweight background thread:
+For each queued request:
 
-1. Loads queued requests
-2. Rebuilds the original OkHttp requests
-3. Sends them sequentially
-4. Removes successful requests from storage
+* URL
+* HTTP Method
+* Headers
+* Request Body
 
-```text
-Queue
-  ↓
-Rebuild Requests
-  ↓
-Retry Sequentially
-  ↓
-Success
-  ↓
-Remove From Queue
-```
-
-All of this happens silently in the background.
-
----
-
-## Supported Methods
-
-| Method | Queued Offline |
-|----------|----------|
-| POST | ✅ |
-| PUT | ✅ |
-| PATCH | ✅ |
-| DELETE | ✅ |
-| GET | ❌ |
-| HEAD | ❌ |
-| OPTIONS | ❌ |
+This allows the original request to be reconstructed and replayed accurately.
 
 ---
 
 ## Why SharedPreferences?
 
-Most offline retry libraries introduce:
+Many offline synchronization libraries require:
 
-- Room databases
-- SQL schemas
-- Migrations
-- Extra dependencies
+* Room Database
+* SQL Schema Management
+* Migrations
+* Additional Dependencies
 
-This interceptor intentionally uses Android's built-in `SharedPreferences` because:
+Offline Retry Interceptor uses Android's built-in SharedPreferences because it is:
 
-- It is fast
-- It is lightweight
-- It requires zero setup
-- It is perfect for small offline queues
+* Lightweight
+* Fast
+* Reliable
+* Available on every Android device
+* Ideal for small-to-medium offline queues
 
 ---
 
-## Use Cases
+## Typical Use Cases
 
 Perfect for:
 
-- Forms
-- Surveys
-- Check-ins
-- Attendance systems
-- CRM apps
-- Field sales applications
-- Delivery apps
-- Inventory management
-- Expense submissions
-- Offline-first mobile applications
+* Survey Applications
+* Attendance Systems
+* CRM Applications
+* Field Sales Apps
+* Delivery Applications
+* Inventory Management
+* Expense Tracking
+* Check-In Systems
+* Data Collection Apps
+* Offline-First Mobile Applications
 
 ---
 
-## Example Scenario
-
-A delivery driver submits a proof-of-delivery form:
+## Real-World Example
 
 ```text
-Driver taps Submit
-        ↓
-Cell signal drops
-        ↓
-Request saved locally
-        ↓
-Driver continues working
-        ↓
-Signal returns
-        ↓
-Request automatically synced
+Driver Submits Delivery Form
+             │
+             ▼
+Network Lost
+             │
+             ▼
+Request Saved Locally
+             │
+             ▼
+Driver Continues Working
+             │
+             ▼
+Connectivity Restored
+             │
+             ▼
+Request Synced Automatically
 ```
 
-No data loss.
+No lost submissions.
 
-No manual retry button.
+No retry button.
 
-No user intervention required.
+No manual intervention.
 
 ---
 
 ## Thread Safety
 
-- Queue writes are synchronized.
-- Retries execute in a background thread.
-- UI thread remains unaffected.
-- Safe for Retrofit and OkHttp concurrent usage.
+* Queue operations are synchronized.
+* Retries run on a background thread.
+* UI thread remains unaffected.
+* Safe for concurrent Retrofit and OkHttp usage.
 
 ---
 
 ## Limitations
 
-- Intended for small to medium request payloads.
-- SharedPreferences is not suitable for large file uploads.
-- Multipart uploads are not currently supported.
-- Requests are retried sequentially.
-- No retry backoff strategy is applied by default.
+* Intended for small-to-medium payloads.
+* Not suitable for large file uploads.
+* Multipart requests are currently unsupported.
+* Requests are retried sequentially.
+* No retry backoff strategy is currently implemented.
 
 ---
 
 ## Roadmap
 
-- [ ] Exponential backoff retries
-- [ ] Multipart request support
-- [ ] Queue inspection APIs
-- [ ] Encryption support
-- [ ] Room-backed storage option
-- [ ] Retry analytics hooks
+* [ ] Exponential Backoff Retries
+* [ ] Multipart Upload Support
+* [ ] Queue Inspection APIs
+* [ ] Request Encryption
+* [ ] Room Database Storage Option
+* [ ] Retry Analytics Hooks
+* [ ] Retry Status Callbacks
+
+---
+
+## Contributing
+
+Contributions, issues, and feature requests are welcome.
+
+Feel free to open an issue or submit a pull request.
 
 ---
 
@@ -279,7 +282,7 @@ No user intervention required.
 
 MIT License
 
-Copyright (c) MockNode
+Copyright (c) Fajar C P
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software.
 
@@ -287,6 +290,8 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 
 ## Author
 
-MockNode
+**Fajar C P**
 
-Build reliable mobile applications that continue working even when the network doesn't.
+Android • Flutter • .NET • Open Source
+
+Building reliable software that continues working even when the network doesn't.
