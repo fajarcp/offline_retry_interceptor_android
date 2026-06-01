@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.library)
+    id("maven-publish")
 }
 
 android {
@@ -7,6 +8,13 @@ android {
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
+        }
+    }
+
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+            withJavadocJar()
         }
     }
 
@@ -43,4 +51,17 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:5.3.2")
 
 
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            create<MavenPublication>("release") {
+                from(components["release"])
+                groupId = "com.github.fajarcp"
+                artifactId = "offline-retry-interceptor"
+                version = "1.0.0"
+            }
+        }
+    }
 }
