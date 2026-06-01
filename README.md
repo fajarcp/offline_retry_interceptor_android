@@ -1,5 +1,5 @@
 # Offline Retry Interceptor
-
+[![](https://jitpack.io/v/fajarcp/offline_retry_interceptor_android.svg)](https://jitpack.io/#fajarcp/offline_retry_interceptor_android)
 A lightweight Android/Kotlin OkHttp interceptor that automatically queues failed network requests when the device is offline and silently retries them when connectivity returns.
 
 Designed for mobile applications where losing user submissions is unacceptable.
